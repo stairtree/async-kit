@@ -21,25 +21,25 @@ import Dispatch
 public final class EventLoopGroupConnectionPool<Source> where Source: ConnectionPoolSource  {
     /// Creates new connections when needed. See `ConnectionPoolSource`.
     public let source: Source
-    
+
     /// Limits the maximum number of connections that can be open at a given time
     /// for a single connection pool.
     public let maxConnectionsPerEventLoop: Int
 
     /// Event loop source when not specified.
     public let eventLoopGroup: EventLoopGroup
-    
+
     // MARK: Private
-    
+
     /// For lifecycle logs.
     private let logger: Logger
-    
+
     /// Synchronize access.
     private let lock: Lock
 
     /// If `true`, this connection pool has been closed.
     private var didShutdown: Bool
-    
+
     /// Actual connection pool storage.
     private let storage: [EventLoop.Key: EventLoopConnectionPool<Source>]
 
@@ -79,7 +79,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
             on: $0
         )) })
     }
-    
+
     /// Fetches a pooled connection for the lifetime of the closure.
     ///
     /// The connection is provided to the supplied callback and will be automatically released when the
@@ -107,7 +107,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
         return self.pool(for: eventLoop ?? self.eventLoopGroup.next())
            .withConnection(logger: logger ?? self.logger, closure)
     }
-    
+
     /// Requests a pooled connection.
     ///
     /// The connection returned by this method should be released when you are finished using it.
@@ -132,7 +132,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
         return self.pool(for: eventLoop ?? self.eventLoopGroup.next())
             .requestConnection(logger: logger ?? self.logger)
     }
-    
+
     /// Releases a connection back to the pool. Use with `requestConnection()`.
     ///
     ///     let conn = try pool.requestConnection(...).wait()
@@ -149,12 +149,12 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
         self.pool(for: connection.eventLoop)
             .releaseConnection(connection, logger: logger ?? self.logger)
     }
-    
+
     /// Returns the `EventLoopConnectionPool` for a specific event loop.
     public func pool(for eventLoop: EventLoop) -> EventLoopConnectionPool<Source> {
         self.storage[eventLoop.key]!
     }
-    
+
     /// Closes the connection pool.
     ///
     /// All available connections will be closed immediately.
@@ -189,7 +189,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
             }
         }
     }
-    
+
     /// Closes the connection pool.
     ///
     /// All available connections will be closed immediately. Any connections still in use will be
@@ -208,7 +208,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
         var possibleError: Error? = nil
         let waiter = DispatchWorkItem {}
         let errorLock = Lock()
-        
+
         self.shutdownGracefully {
             if let error = $0 {
                 errorLock.withLock { possibleError = error }
@@ -222,7 +222,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
             }
         }
     }
-    
+
     /// Closes the connection pool.
     ///
     /// All available connections will be closed immediately. Any connections still in use will be
@@ -252,7 +252,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
                 }
                 return false
             }
-            
+
             // Set the flag as soon as we know a shutdown is needed.
             self.didShutdown = true
             self.logger.trace("Connection group pool shutdown start - telling the loop pools what's up.")
@@ -260,7 +260,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
             // it's also true there's nothing else to block that we care about after shutdown begin.
             return true
         }) else { return }
-        
+
         // Tell each pool to shut down and take note of any errors if they show up. Use the dispatch
         // queue to manage synchronization to avoid being trapped on any of our own event loops. When
         // all pools are closed, invoke the callback and provide it the first encountered error, if
@@ -269,7 +269,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
         let shutdownQueue = DispatchQueue(label: "codes.vapor.async-kit.poolShutdownGracefullyQueue")
         let shutdownGroup = DispatchGroup()
         var outcome: Result<Void, Error> = .success(())
-        
+
         for pool in self.storage.values {
             shutdownGroup.enter()
             pool.close().whenComplete { result in
@@ -279,7 +279,7 @@ public final class EventLoopGroupConnectionPool<Source> where Source: Connection
                 }
             }
         }
-        
+
         shutdownGroup.notify(queue: shutdownQueue) {
             switch outcome {
             case .success:
